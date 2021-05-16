@@ -1,0 +1,179 @@
+---
+title: '**ASSOCIATION RULES**'
+author: "_**Hande Çelebi**_"
+date: "16 05 2021"
+output:
+  html_document:
+    keep_md: yes
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+
+Association rules are the probability of relationships between data items, within large data sets in various types of databases. It shows that itemset's frequent in transactions. Most common example of association rules is market basket analysis.
+
+## MARKET BASKET ANALYSIS
+
+Market basket analysis examines the purchasing tendencies of the customers. In this analysis, the association rules of the products purchased by the customers is found, and the purchasing habits of the customers are determined in line with these association.
+
+For instance, Let the example below be a transaction taken from the sales data of some supermarkets.
+
+{onions , potatoes} → {burger}
+
+If a customer buys onions and potatoes, we can say that the customer is likely to buy burger.
+
+According to association rules itemsets always have sub items and left hand side of the rules is condition that we expected, right hand side of the rules is result of these condition.
+
+Association rules are unsupervised machine learning types and that means we dont have to train and label data. All we need is apply appropriate algorihm to data and expect for it to make the correct classification.
+
+## APRIORI
+
+Most popular algorithm to analyse market basket data is apriori. 
+According to apriori frequent items in transactions should also be frequent in sub transaction.
+
+There are 3 important paremeters in apriori algorithm:
+* Support
+* Confidence
+* Lift
+
+Support refers to the default popularity of an item and can be calculated by finding number of transactions containing a particular item divided by total number of transactions.
+
+Confidence refers to the likelihood that an item B is also bought if item A is bought. It can be calculated by finding the number of transactions where A and B are bought together, divided by total number of transactions where A is bought.
+
+Lift(A -> B) refers to the increase in the ratio of sale of B when A is sold. Lift(A –> B) can be calculated by dividing Confidence(A -> B) divided by Support(B).
+
+
+The market basket data used in this project contains information about customers buying different grocery items at a mall. Lets examine market basket data deeply.
+
+
+```{r library, include = FALSE}
+library(arules)
+MarketBasket <- read.transactions("Market_Basket_Optimisation.csv", sep = ",", header = T)
+
+```
+
+```{r market basket}
+
+summary(MarketBasket)
+```
+
+* When we examine the data set with the Summary command;
+
+* It shows the number of 7500 transactions, 119 different products. The value of density (3.2%) refers to the proportion of non-zero matrix cells.
+
+* Since there are 7500 * 119 = 892,500 positions in the matrix, we can calculate that a total of 892,500 * 0.03287171 = 29,338 items were purchased in the store.
+
+* Most frequent items show the most frequently purchased items. With 1787/7500 = 0.23, we can say that 23% of the shopping contains mineral water.
+
+* The element section contains the statistics of how many items are included in each purchase. There are 1 product in 1754 shopping, 2 product in 1358 shopping, 1044 product in 1044 shopping.
+
+* On average, there are 4 products in one shop.
+
+```{r st}
+inspect(MarketBasket[1:5])
+itemFrequency(MarketBasket[,1:3])
+```
+With the Inspect command, each transaction can be examined separately. The first five transactions are as above.
+
+The ItemFrequency command allows us to calculate the transaction rate for each product. 
+
+```{r plot}
+itemFrequencyPlot(MarketBasket, topN = 20)
+```
+
+The chart shows the 20 most purchased items.
+
+```{r plot 2}
+itemFrequencyPlot(MarketBasket, support = .1)
+```
+
+In this chart, products with at least 10% support rate are shown.
+
+```{r sparse}
+par(mfrow=c(2,2))
+image(MarketBasket[1:10])
+image(sample(MarketBasket,100))
+```
+
+The first graphic shows the first 10 transactions and their distribution among 119 products. The other shows 100 randomly selected transactions and their distribution in 119 products. These charts allow us to examine the data more closely and can help identify potential data problems.
+
+For example, fully filled columns may show items purchased in each transaction, or sparse columns may show data that was mistakenly included in the transaction dataset.
+
+```{r apriori}
+MarketBasketRules <- apriori(MarketBasket, parameter = list(supp = 0.008, conf = 0.25, minlen = 2))
+```
+In this step, we created the apriori algorithm.
+
+When deciding on the support value, if we consider the situation where each item is purchased twice a day, we can assume that there are approximately 60 transactions within a month.
+If we calculate the support value of 60 repetitions in 7500 transactions, we reach 60/7500 = 0.008. For this reason, we can first try the value of 0.008 as a support value.
+
+0.25 confidence indicates that the rule must be at least 25 percent correct to be included in the results.
+
+On the other hand, Minlen prevents transactions that contain less than 2 products from circumventing the rule and creating meaningless rules. As a result of these parameters, the algorithm has created 153 rules.
+
+```{r summary}
+summary(MarketBasketRules)
+```
+
+Rule length distribution section shows how many rules there are in transactions with 2 and 3 items. We can say that 70 of 153 rules are transactions with 2, 83 of which contain 3 products.
+
+In the Summary of quality measures section, we see the summary statistics table of each parameter. The fact that the support and confidence values are close to the minimum value may indicate that we set the parameter values too high. However, when we examine the table, we see that there are rules with high values. Therefore, we can say that the values we have determined are appropriate. A high lift value is a strong indicator that a rule is important and reflects a true link between items.
+
+```{r inspect}
+inspect(MarketBasketRules[1:3])
+```
+
+We can examine the rules with the inspect command. For example, according to the first 3 rules, if a customer buys french wine, they will also buy mineral water and this rule is correct for 0.8% transaction and 36% of purchases include french wine. The lift value indicates how likely a customer buying French wine is to buy mineral water than an average customer.
+
+We can divide the rules obtained in association analysis into 3 classes:
+
+* Actionable
+* Pointless
+* Inexplicable
+
+The general purpose in market basket analysis is to obtain actionable rules. When the above example is examined, we can say that the relationship between wine and mineral water is pointless. We will need to make some improvements to the performance of the model in order to achieve actionable rules.
+
+```{r lift}
+inspect(sort(MarketBasketRules, by = "lift")[1:5])
+```
+
+When we sort the rules according to lift values with the Sort command, it shows that a customer who buys whole wheat pasta with approximately 4.13 lift value for the first rule is 4.13 times more likely to buy olive oil compared to an average customer. In this way, we get actionable rules.
+
+```{r oliveoil}
+oliveoil <- subset(MarketBasketRules, items %in% "olive oil")
+inspect(oliveoil)
+```
+
+With the subset command, we can examine the rules that contain a specific product. If we examine the olive oil, which we see in the other table, has a high lift value. We can say that it has significant lift values with milk and spaghetti as well as whole wheat pasta.
+
+## ECLAT
+
+* The name of the Eclat algorithm comes from the combination of the words Equivalence Class Transformation.
+
+* It is a more efficient and scalable version of the Apriori algorithm.
+
+* While the Apriori algorithm works in a horizontal sense imitating the Breadth-First Search of a graph, the ECLAT algorithm works in a vertical manner just like the Depth-First Search of a graph. This vertical approach of the ECLAT algorithm makes it a faster algorithm than the Apriori algorithm.
+
+```{r eclat}
+eclatrules <- eclat(MarketBasket, parameter = list(support = 0.008, minlen = 2))
+summary(eclatrules)
+```
+
+Unlike the Apriori algorithm, it only works with the support parameter. When we applied the same support value, the algorithm created 271 rules.
+
+```{r eclat sort}
+inspect(sort(eclatrules, by ="support")[1:5])
+oliveoil2 <- subset(eclatrules, items %in% "olive oil")
+inspect(oliveoil2)
+```
+When sorting according to the support values with the Sort command, results close to the apriori ranking were obtained. Likewise, if we examine the olive oil product specifically, 16 meaningful and actionable rules are listed.
+
+## REFERENCES
+
+* Karthik Ramasubramanian , Abhishek Singh Machine Learning Using R
+* Bernard Marr Artificial Intelligence in Practice How 50 Successful Companies Used AI
+* https://www.geeksforgeeks.org/ml eclat algorithm/
+* https://www.kaggle.com/devchauhan1/market basket optimisationcsv
+* https://www.veribilimiokulu.com/associationrulesanalysis/
+
